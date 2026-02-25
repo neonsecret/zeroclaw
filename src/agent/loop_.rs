@@ -1873,6 +1873,7 @@ pub(crate) async fn agent_turn(
     silent: bool,
     multimodal_config: &crate::config::MultimodalConfig,
     max_tool_iterations: usize,
+    max_tool_output_chars: usize,
 ) -> Result<String> {
     run_tool_call_loop(
         provider,
@@ -1887,6 +1888,7 @@ pub(crate) async fn agent_turn(
         "channel",
         multimodal_config,
         max_tool_iterations,
+        max_tool_output_chars,
         None,
         None,
         None,
@@ -2077,6 +2079,7 @@ pub(crate) async fn run_tool_call_loop(
     channel_name: &str,
     multimodal_config: &crate::config::MultimodalConfig,
     max_tool_iterations: usize,
+    max_tool_output_chars: usize,
     cancellation_token: Option<CancellationToken>,
     on_delta: Option<tokio::sync::mpsc::Sender<String>>,
     hooks: Option<&crate::hooks::HookRunner>,
@@ -2627,11 +2630,18 @@ pub(crate) async fn run_tool_call_loop(
 
         for entry in ordered_results {
             if let Some((tool_name, tool_call_id, outcome)) = entry {
-                individual_results.push((tool_call_id, outcome.output.clone()));
+                let output = if max_tool_output_chars > 0
+                    && outcome.output.len() > max_tool_output_chars
+                {
+                    truncate_with_ellipsis(&outcome.output, max_tool_output_chars)
+                } else {
+                    outcome.output.clone()
+                };
+                individual_results.push((tool_call_id, output.clone()));
                 let _ = writeln!(
                     tool_results,
                     "<tool_result name=\"{}\">\n{}\n</tool_result>",
-                    tool_name, outcome.output
+                    tool_name, output
                 );
             }
         }
@@ -2669,6 +2679,20 @@ pub(crate) async fn run_tool_call_loop(
                 history.push(ChatMessage::tool(tool_msg.to_string()));
             }
         }
+
+        // Mid-loop safety trim: prevent unbounded history growth during long
+        // tool-call sequences. Without this, 200 iterations of tool calls +
+        // results can exceed the model context window. Uses cheap deterministic
+        // trimming (no LLM call) to keep history within max_history bounds.
+        let max_history = if max_tool_output_chars > 0 {
+            // Use max_history_messages from the caller context, but fall back
+            // to a sensible cap. Each tool iteration adds ~2 messages
+            // (assistant + tool result), so cap at 60 to leave room.
+            60
+        } else {
+            DEFAULT_MAX_HISTORY_MESSAGES
+        };
+        trim_history(history, max_history);
     }
 
     runtime_trace::record_event(
@@ -3033,6 +3057,7 @@ pub async fn run(
             channel_name,
             &config.multimodal,
             config.agent.max_tool_iterations,
+            config.agent.max_tool_output_chars,
             None,
             None,
             None,
@@ -3155,6 +3180,7 @@ pub async fn run(
                 channel_name,
                 &config.multimodal,
                 config.agent.max_tool_iterations,
+                config.agent.max_tool_output_chars,
                 None,
                 None,
                 None,
@@ -3390,6 +3416,7 @@ pub async fn process_message(config: Config, message: &str) -> Result<String> {
         true,
         &config.multimodal,
         config.agent.max_tool_iterations,
+        config.agent.max_tool_output_chars,
     )
     .await
 }
@@ -3699,6 +3726,7 @@ mod tests {
             "cli",
             &crate::config::MultimodalConfig::default(),
             3,
+            0,
             None,
             None,
             None,
@@ -3745,6 +3773,7 @@ mod tests {
             "cli",
             &multimodal,
             3,
+            0,
             None,
             None,
             None,
@@ -3785,6 +3814,7 @@ mod tests {
             "cli",
             &crate::config::MultimodalConfig::default(),
             3,
+            0,
             None,
             None,
             None,
@@ -3911,6 +3941,7 @@ mod tests {
             "telegram",
             &crate::config::MultimodalConfig::default(),
             4,
+            0,
             None,
             None,
             None,
@@ -3980,6 +4011,7 @@ mod tests {
             "cli",
             &crate::config::MultimodalConfig::default(),
             4,
+            0,
             None,
             None,
             None,
@@ -4036,6 +4068,7 @@ mod tests {
             "cli",
             &crate::config::MultimodalConfig::default(),
             4,
+            0,
             None,
             None,
             None,

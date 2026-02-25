@@ -407,6 +407,7 @@ impl DelegateTool {
                 "delegate",
                 &self.multimodal_config,
                 agent_config.max_iterations,
+                0,
                 None,
                 None,
                 None,

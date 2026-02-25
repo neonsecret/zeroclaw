@@ -411,6 +411,11 @@ pub struct AgentConfig {
     /// Tool dispatch strategy (e.g. `"auto"`). Default: `"auto"`.
     #[serde(default = "default_agent_tool_dispatcher")]
     pub tool_dispatcher: String,
+    /// Maximum characters per tool result before truncation. Default: `30000`.
+    /// Prevents oversized tool outputs (e.g. large file reads) from exceeding
+    /// the model context window. Set to `0` to disable truncation.
+    #[serde(default = "default_agent_max_tool_output_chars")]
+    pub max_tool_output_chars: usize,
 }
 
 fn default_agent_max_tool_iterations() -> usize {
@@ -425,6 +430,10 @@ fn default_agent_tool_dispatcher() -> String {
     "auto".into()
 }
 
+fn default_agent_max_tool_output_chars() -> usize {
+    30_000
+}
+
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
@@ -433,6 +442,7 @@ impl Default for AgentConfig {
             max_history_messages: default_agent_max_history_messages(),
             parallel_tools: false,
             tool_dispatcher: default_agent_tool_dispatcher(),
+            max_tool_output_chars: default_agent_max_tool_output_chars(),
         }
     }
 }

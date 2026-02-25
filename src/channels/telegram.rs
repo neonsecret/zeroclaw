@@ -2379,6 +2379,17 @@ impl Channel for TelegramChannel {
             return Ok(());
         }
 
+        // Check if it's "message is not modified" — treat as success (draft already has final text)
+        if let Ok(body) = resp.json::<serde_json::Value>().await {
+            if body.get("description")
+                .and_then(|d| d.as_str())
+                .map(|d| d.contains("message is not modified"))
+                .unwrap_or(false)
+            {
+                return Ok(());
+            }
+        }
+
         // Edit failed entirely — fall back to new message
         tracing::warn!("Telegram finalize_draft edit failed; falling back to sendMessage");
         self.send_text_chunks(text, &chat_id, thread_id.as_deref())
