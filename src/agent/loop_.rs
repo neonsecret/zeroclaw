@@ -2328,6 +2328,12 @@ pub(crate) async fn run_tool_call_loop(
         if let Some(ref tx) = on_delta {
             let llm_secs = llm_started_at.elapsed().as_secs();
             if !tool_calls.is_empty() {
+                // Relay the LLM's reasoning/commentary alongside tool calls
+                if !display_text.is_empty() {
+                    let _ = tx
+                        .send(format!("\u{1f4ad} {}\n", display_text.trim()))
+                        .await;
+                }
                 let _ = tx
                     .send(format!(
                         "\u{1f4ac} Got {} tool call(s) ({llm_secs}s)\n",

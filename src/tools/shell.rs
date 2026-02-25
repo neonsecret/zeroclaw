@@ -7,10 +7,12 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Maximum shell command execution time before kill.
-const SHELL_TIMEOUT_SECS: u64 = 60;
-/// Maximum output size in bytes (1MB).
-const MAX_OUTPUT_BYTES: usize = 1_048_576;
+/// Default shell command execution time before kill.
+const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 120;
+/// Maximum shell command execution time the agent may request.
+const MAX_SHELL_TIMEOUT_SECS: u64 = 1800;
+/// Maximum output size in bytes (4MB).
+const MAX_OUTPUT_BYTES: usize = 4_194_304;
 /// Environment variables safe to pass to shell commands.
 /// Only functional variables are included — never API keys or secrets.
 const SAFE_ENV_VARS: &[&str] = &[
@@ -79,6 +81,11 @@ impl Tool for ShellTool {
                     "type": "boolean",
                     "description": "Set true to explicitly approve medium/high-risk commands in supervised mode",
                     "default": false
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Timeout in seconds (default 120, max 1800). Use higher values for long-running commands like claude CLI.",
+                    "default": 120
                 }
             },
             "required": ["command"]
@@ -94,6 +101,11 @@ impl Tool for ShellTool {
             .get("approved")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
+        let timeout_secs = args
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(DEFAULT_SHELL_TIMEOUT_SECS)
+            .min(MAX_SHELL_TIMEOUT_SECS);
 
         if self.security.is_rate_limited() {
             return Ok(ToolResult {
@@ -155,7 +167,7 @@ impl Tool for ShellTool {
         }
 
         let result =
-            tokio::time::timeout(Duration::from_secs(SHELL_TIMEOUT_SECS), cmd.output()).await;
+            tokio::time::timeout(Duration::from_secs(timeout_secs), cmd.output()).await;
 
         match result {
             Ok(Ok(output)) => {
@@ -165,11 +177,11 @@ impl Tool for ShellTool {
                 // Truncate output to prevent OOM
                 if stdout.len() > MAX_OUTPUT_BYTES {
                     stdout.truncate(stdout.floor_char_boundary(MAX_OUTPUT_BYTES));
-                    stdout.push_str("\n... [output truncated at 1MB]");
+                    stdout.push_str("\n... [output truncated at 4MB]");
                 }
                 if stderr.len() > MAX_OUTPUT_BYTES {
                     stderr.truncate(stderr.floor_char_boundary(MAX_OUTPUT_BYTES));
-                    stderr.push_str("\n... [stderr truncated at 1MB]");
+                    stderr.push_str("\n... [stderr truncated at 4MB]");
                 }
 
                 Ok(ToolResult {
@@ -191,7 +203,7 @@ impl Tool for ShellTool {
                 success: false,
                 output: String::new(),
                 error: Some(format!(
-                    "Command timed out after {SHELL_TIMEOUT_SECS}s and was killed"
+                    "Command timed out after {timeout_secs}s and was killed. Use a higher 'timeout' parameter (max {MAX_SHELL_TIMEOUT_SECS}s) for long-running commands."
                 )),
             }),
         }
@@ -551,14 +563,15 @@ mod tests {
 
     #[test]
     fn shell_timeout_constant_is_reasonable() {
-        assert_eq!(SHELL_TIMEOUT_SECS, 60, "shell timeout must be 60 seconds");
+        assert_eq!(DEFAULT_SHELL_TIMEOUT_SECS, 120, "default shell timeout must be 120 seconds");
+        assert_eq!(MAX_SHELL_TIMEOUT_SECS, 1800, "max shell timeout must be 1800 seconds");
     }
 
     #[test]
-    fn shell_output_limit_is_1mb() {
+    fn shell_output_limit_is_4mb() {
         assert_eq!(
-            MAX_OUTPUT_BYTES, 1_048_576,
-            "max output must be 1 MB to prevent OOM"
+            MAX_OUTPUT_BYTES, 4_194_304,
+            "max output must be 4 MB to prevent OOM"
         );
     }
 
