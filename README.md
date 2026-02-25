@@ -25,7 +25,7 @@ Built by students and members of the Harvard, MIT, and Sundai.Club communities.
 </p>
 
 <p align="center">
-  🌐 <strong>Languages:</strong> <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a> · <a href="README.fr.md">Français</a> · <a href="README.vi.md">Tiếng Việt</a>
+  🌐 <strong>Languages:</strong> <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a> · <a href="README.fr.md">Français</a> · <a href="README.vi.md">Tiếng Việt</a> · <a href="README.el.md">Ελληνικά</a>
 </p>
 
 <p align="center">
@@ -72,6 +72,7 @@ Use this board for important notices (breaking changes, security advisories, mai
 - 💰 **Cost-Efficient Deployment:** Designed for low-cost boards and small cloud instances without heavyweight runtime dependencies.
 - ⚡ **Fast Cold Starts:** Single-binary Rust runtime keeps command and daemon startup near-instant for daily operations.
 - 🌍 **Portable Architecture:** One binary-first workflow across ARM, x86, and RISC-V with swappable providers/channels/tools.
+- 🔍 **Research Phase:** Proactive information gathering through tools before response generation — reduces hallucinations by fact-checking first.
 
 ### Why teams pick ZeroClaw
 
@@ -218,6 +219,32 @@ To require binary-only install with no source fallback:
 
 ```bash
 brew install zeroclaw
+```
+
+### Linux pre-built installer (beginner-friendly)
+
+For Linux hosts that prefer a pre-built binary (no local Rust build), use the
+repository-maintained release installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install-release.sh | bash
+```
+
+What it does:
+
+- Detects your Linux CPU architecture (`x86_64`, `aarch64`, `armv7`)
+- Downloads the matching asset from the latest official GitHub release
+- Installs `zeroclaw` into a local bin directory (or `/usr/local/bin` if needed)
+- Starts `zeroclaw onboard` (skip with `--no-onboard`)
+
+Examples:
+
+```bash
+# Install and start onboarding (default)
+curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install-release.sh | bash
+
+# Install only (no onboarding)
+curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install-release.sh | bash -s -- --no-onboard
 ```
 
 ### One-click bootstrap

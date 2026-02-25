@@ -26,6 +26,14 @@ Schema export command:
 | `provider_api` | unset | Optional API mode for `custom:<url>` providers: `openai-chat-completions` or `openai-responses` |
 | `default_model` | `anthropic/claude-sonnet-4-6` | model routed through selected provider |
 | `default_temperature` | `0.7` | model temperature |
+| `model_support_vision` | unset (`None`) | Vision support override for active provider/model |
+
+Notes:
+
+- `model_support_vision = true` forces vision support on (e.g. Ollama running `llava`).
+- `model_support_vision = false` forces vision support off.
+- Unset keeps the provider's built-in default.
+- Environment override: `ZEROCLAW_MODEL_SUPPORT_VISION` or `MODEL_SUPPORT_VISION` (values: `true`/`false`/`1`/`0`/`yes`/`no`/`on`/`off`).
 
 ## `[observability]`
 
@@ -177,6 +185,47 @@ provider = "ollama"
 model = "qwen2.5-coder:32b"
 temperature = 0.2
 ```
+
+## `[research]`
+
+Research phase allows the agent to gather information through tools before generating the main response.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `enabled` | `false` | Enable research phase |
+| `trigger` | `never` | Research trigger strategy: `never`, `always`, `keywords`, `length`, `question` |
+| `keywords` | `["find", "search", "check", "investigate"]` | Keywords that trigger research (when trigger = `keywords`) |
+| `min_message_length` | `50` | Minimum message length to trigger research (when trigger = `length`) |
+| `max_iterations` | `5` | Maximum tool calls during research phase |
+| `show_progress` | `true` | Show research progress to user |
+
+Notes:
+
+- Research phase is **disabled by default** (`trigger = never`).
+- When enabled, the agent first gathers facts through tools (grep, file_read, shell, memory search), then responds using the collected context.
+- Research runs before the main agent turn and does not count toward `agent.max_tool_iterations`.
+- Trigger strategies:
+  - `never` — research disabled (default)
+  - `always` — research on every user message
+  - `keywords` — research when message contains any keyword from the list
+  - `length` — research when message length exceeds `min_message_length`
+  - `question` — research when message contains '?'
+
+Example:
+
+```toml
+[research]
+enabled = true
+trigger = "keywords"
+keywords = ["find", "show", "check", "how many"]
+max_iterations = 3
+show_progress = true
+```
+
+The agent will research the codebase before responding to queries like:
+- "Find all TODO in src/"
+- "Show contents of main.rs"
+- "How many files in the project?"
 
 ## `[runtime]`
 
